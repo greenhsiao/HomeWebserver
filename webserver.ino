@@ -4,7 +4,7 @@
 struct {
   uint32_t crc32;   // 4 bytes
   uint8_t channel;  // 1 byte,   5 in total
-  uint8_t bssid[6]; // 6 bytes, 11 in total
+  uint8_t ap_mac[6]; // 6 bytes, 11 in total (BSSID)
   uint8_t padding;  // 1 byte,  12 in total
 } rtcData;
 
@@ -46,7 +46,7 @@ const int output5 = 5;
 
 void goToSleep(){
   Serial.print("Go to Sleep");
-  ESP.deepSleep(3000000);
+  ESP.deepSleep(3000000,WAKE_RF_DISABLED);
 
 }
 
@@ -59,21 +59,114 @@ void setup() {
   digitalWrite(output5, LOW);
 
 
-  // Connect to Wi-Fi network with SSID and password
-  Serial.print("Connecting to ");
-  Serial.println(ssid);
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
+  // Try to read WiFi settings from RTC memory
+  bool rtcValid = false;
+  if( ESP.rtcUserMemoryRead( 0, (uint32_t*)&rtcData, sizeof( rtcData ) ) ) {
+    // Calculate the CRC of what we just read from RTC memory, but skip the first 4 bytes as that's the checksum itself.
+    uint32_t crc = calculateCRC32( ((uint8_t*)&rtcData) + 4, sizeof( rtcData ) - 4 );
+    if( crc == rtcData.crc32 ) {
+      rtcValid = true;
+      Serial.println("rtc Valid = True");
+    }
   }
+
+  
+ 
+  
+  Serial.print("BSSID from RTC: ");
+  Serial.print(rtcData.ap_mac[5],HEX);
+  Serial.print(":");
+  Serial.print(rtcData.ap_mac[4],HEX);
+  Serial.print(":");
+  Serial.print(rtcData.ap_mac[3],HEX);
+  Serial.print(":");
+  Serial.print(rtcData.ap_mac[2],HEX);
+  Serial.print(":");
+  Serial.print(rtcData.ap_mac[1],HEX);
+  Serial.print(":");
+  Serial.println(rtcData.ap_mac[0],HEX);
+  
+  Serial.print("print rtcValid = ");
+  Serial.println(rtcValid);
+  if( rtcValid ) {
+    // The RTC data was good, make a quick connection
+    Serial.print("Get Wifi AP data from RTC memroy ");
+    WiFi.begin( ssid, password, rtcData.channel, rtcData.ap_mac, true );
+  }
+  else {
+    // The RTC data was not valid, so make a regular connection
+    WiFi.begin( ssid, password );
+    // Connect to Wi-Fi network with SSID and password
+    Serial.print("Connecting to ");
+    Serial.println(ssid);
+    
+  }
+
+  
+  int retries = 0;
+  int wifiStatus = WiFi.status();
+  while( wifiStatus != WL_CONNECTED ) {
+    retries++;
+    if( retries == 100 ) {
+      // Quick connect is not working, reset WiFi and try regular connection
+      WiFi.disconnect();
+      delay( 10 );
+      WiFi.forceSleepBegin();
+      delay( 10 );
+      WiFi.forceSleepWake();
+      delay( 10 );
+      WiFi.begin( ssid, password );
+      Serial.println("Quick connect is not working ");
+    }
+    if( retries == 600 ) {
+      // Giving up after 30 seconds and going back to sleep
+      WiFi.disconnect( true );
+      delay( 1 );
+      WiFi.mode( WIFI_OFF );
+      Serial.print("Over 600 times connections");
+      return; // Not expecting this to be called, the previous call will never return.
+    }
+    delay( 50 );
+    wifiStatus = WiFi.status();
+  }
+
+  // Write current connection info back to RTC
+  rtcData.channel = WiFi.channel();
+
+
+  memcpy( rtcData.ap_mac, WiFi.BSSID(), 6 ); // Copy 6 bytes of BSSID (AP's MAC address)
+
+  uint8_t bssid[6];
+ 
+  memcpy( bssid, WiFi.BSSID(), 6 ); // Copy 6 bytes of BSSID (AP's MAC address)
+  Serial.print("BSSID: ");
+  Serial.print(bssid[5],HEX);
+  Serial.print(":");
+  Serial.print(bssid[4],HEX);
+  Serial.print(":");
+  Serial.print(bssid[3],HEX);
+  Serial.print(":");
+  Serial.print(bssid[2],HEX);
+  Serial.print(":");
+  Serial.print(bssid[1],HEX);
+  Serial.print(":");
+  Serial.println(bssid[0],HEX);
+  
+  
+  Serial.print("print rtcData.channel = ");
+  Serial.print(rtcData.channel);
+
+  
+  rtcData.crc32 = calculateCRC32( ((uint8_t*)&rtcData) + 4, sizeof( rtcData ) - 4 );
+  ESP.rtcUserMemoryWrite( 0, (uint32_t*)&rtcData, sizeof( rtcData ) );
+
   // Print local IP address and start web server
   Serial.println("");
   Serial.println("WiFi connected.");
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
   server.begin();
-  blinker.attach(2, goToSleep);
+  blinker.attach(5, goToSleep);
 }
 
 void loop(){

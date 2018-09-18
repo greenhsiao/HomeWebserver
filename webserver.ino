@@ -55,6 +55,7 @@ void goToSleep(){
 }
 
 void setup() {
+  //WiFi.setOutputPower(0); reduce RF TX power
   Serial.begin(115200);
   // Initialize the output variables as outputs
   pinMode(output5, OUTPUT);
@@ -74,25 +75,12 @@ void setup() {
     }
   }
 
-  
- 
-  
-  Serial.print("BSSID from RTC: ");
-  Serial.print(rtcData.ap_mac[5],HEX);
-  Serial.print(":");
-  Serial.print(rtcData.ap_mac[4],HEX);
-  Serial.print(":");
-  Serial.print(rtcData.ap_mac[3],HEX);
-  Serial.print(":");
-  Serial.print(rtcData.ap_mac[2],HEX);
-  Serial.print(":");
-  Serial.print(rtcData.ap_mac[1],HEX);
-  Serial.print(":");
-  Serial.println(rtcData.ap_mac[0],HEX);
-  
-  Serial.print("print rtcValid = ");
-  Serial.println(rtcValid);
 
+  IPAddress ip(192,168,0,100);   
+  IPAddress gateway(192,168,0,1);   
+  IPAddress subnet(255,255,255,0);   
+  WiFi.config(ip, gateway, subnet);
+ 
   
   if( rtcValid ) {
     // The RTC data was good, make a quick connection

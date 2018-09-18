@@ -29,8 +29,8 @@ uint32_t calculateCRC32( const uint8_t *data, size_t length ) {
 Ticker blinker;
  
 // Replace with your network credentials
-const char* ssid     = "king24";
-const char* password = "queenyes";
+const char* ssid     = "DDD";
+const char* password = "funal2222";
 
 // Set web server port number to 80
 WiFiServer server(80);
@@ -46,7 +46,11 @@ const int output5 = 5;
 
 void goToSleep(){
   Serial.print("Go to Sleep");
-  ESP.deepSleep(3000000,WAKE_RF_DISABLED);
+  WiFi.forceSleepBegin();
+  delay( 10 );
+
+  WiFi.mode(WIFI_OFF);
+  ESP.deepSleep(4000000);
 
 }
 
@@ -88,6 +92,8 @@ void setup() {
   
   Serial.print("print rtcValid = ");
   Serial.println(rtcValid);
+
+  
   if( rtcValid ) {
     // The RTC data was good, make a quick connection
     Serial.print("Get Wifi AP data from RTC memroy ");
@@ -103,8 +109,18 @@ void setup() {
   }
 
   
+  
   int retries = 0;
   int wifiStatus = WiFi.status();
+  
+
+/*
+  while (WiFi.status() != WL_CONNECTED)
+  {
+    delay(500);
+    Serial.print(".");
+  }
+  */
   while( wifiStatus != WL_CONNECTED ) {
     retries++;
     if( retries == 100 ) {
@@ -130,33 +146,22 @@ void setup() {
     wifiStatus = WiFi.status();
   }
 
+
+
   // Write current connection info back to RTC
   rtcData.channel = WiFi.channel();
 
 
   memcpy( rtcData.ap_mac, WiFi.BSSID(), 6 ); // Copy 6 bytes of BSSID (AP's MAC address)
-
-  uint8_t bssid[6];
- 
-  memcpy( bssid, WiFi.BSSID(), 6 ); // Copy 6 bytes of BSSID (AP's MAC address)
-  Serial.print("BSSID: ");
-  Serial.print(bssid[5],HEX);
-  Serial.print(":");
-  Serial.print(bssid[4],HEX);
-  Serial.print(":");
-  Serial.print(bssid[3],HEX);
-  Serial.print(":");
-  Serial.print(bssid[2],HEX);
-  Serial.print(":");
-  Serial.print(bssid[1],HEX);
-  Serial.print(":");
-  Serial.println(bssid[0],HEX);
+  /*
   
-  
-  Serial.print("print rtcData.channel = ");
-  Serial.print(rtcData.channel);
-
-  
+  rtcData.ap_mac[5] = 0x0A;
+  rtcData.ap_mac[4] = 0x98;
+  rtcData.ap_mac[3] = 0x9A;
+  rtcData.ap_mac[2] = 0x5A;
+  rtcData.ap_mac[1] = 0x26;
+  rtcData.ap_mac[0] = 0x00;
+  */
   rtcData.crc32 = calculateCRC32( ((uint8_t*)&rtcData) + 4, sizeof( rtcData ) - 4 );
   ESP.rtcUserMemoryWrite( 0, (uint32_t*)&rtcData, sizeof( rtcData ) );
 
